@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CipherMsg — Шифрование для мессенджеров</title>
+<link rel="icon" type="image/png" href="https://foxhardsoftness.ru/images/Logo.png">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Roboto:wght@400;500&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  :root {
+    --orange:       #ffa500;
+    --orange-dark:  #dc6d04;
+    --orange-dim:   rgba(255,140,0,0.3);
+    --orange-faint: rgba(255,165,0,0.08);
+    --bg:           #313335;
+    --bg-card:      #212325;
+    --bg-input:     #2a2c2e;
+    --border:       #ffa500;
+    --border-dim:   #444;
+    --text:         #ffffff;
+    --muted:        #c0c0c0;
+    --error:        #ff6b35;
+    --success:      #7dff8a;
+    --mono:         'JetBrains Mono', monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    min-height: 100%;
+    background: var(--bg);
+    font-family: 'Roboto', Arial, sans-serif;
+    color: var(--text);
+  }
+
+  /* Оранжевые полосы по бокам */
+  body::before, body::after {
+    content: '';
+    position: fixed;
+    top: 0; bottom: 0;
+    width: 10px;
+    background: linear-gradient(to bottom, rgba(255,140,0,0.8), rgba(255,165,0,0.8), rgba(255,140,0,0.8));
+    z-index: 1000;
+    pointer-events: none;
+  }
+  body::before { left: 0; }
+  body::after  { right: 0; }
+
+  .bg-grid {
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,165,0,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,165,0,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .bg-glow {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 700px; height: 700px;
+    background: radial-gradient(ellipse, rgba(255,140,0,0.05) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper {
+    position: relative;
+    z-index: 1;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 40px 30px 80px;
+  }
+
+  /* HEADER */
+  header {
+    text-align: center;
+    margin-bottom: 44px;
+  }
+
+  .logo-title {
+    font-family: 'Oswald', 'Impact', sans-serif;
+    font-size: 2.2rem;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    background: linear-gradient(45deg, #e0e0e0 25%, #ffa500 50%, #c0c0c0 75%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    line-height: 1.1;
+  }
+
+  .logo-sub {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+
+  .header-divider {
+    width: 80px;
+    height: 3px;
+    background: linear-gradient(to right, transparent, var(--orange), transparent);
+    margin: 14px auto 0;
+    border-radius: 2px;
+  }
+
+  .security-badges {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 18px;
+  }
+
+  .badge {
+    font-family: 'Oswald', sans-serif;
+    font-size: 10px;
+    padding: 3px 10px;
+    border: 1px solid var(--border-dim);
+    border-radius: 4px;
+    color: var(--muted);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+  .badge.hot { border-color: var(--orange); color: var(--orange); }
+
+  /* TABS */
+  .tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    border: 2px solid var(--orange);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 28px;
+  }
+
+  .tab {
+    padding: 13px;
+    text-align: center;
+    font-family: 'Oswald', 'Impact', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--muted);
+    background: var(--bg-card);
+    user-select: none;
+  }
+  .tab:not(:last-child) { border-right: 1px solid var(--border-dim); }
+  .tab.active {
+    background: linear-gradient(to bottom, #ffa500, #dc6d04);
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  }
+  .tab:not(.active):hover { background: var(--orange-faint); color: var(--orange); }
+
+  /* PANELS */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* CARD */
+  .card {
+    background: var(--bg-card);
+    border: 3px solid var(--orange);
+    border-radius: 15px;
+    padding: 28px;
+    margin-bottom: 16px;
+    box-shadow: 0 0 10px var(--orange-dim), 0 0 40px rgba(255,140,0,0.07);
+    animation: fadeIn 0.35s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .card-label {
+    font-family: 'Oswald', sans-serif;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 18px;
+    opacity: 0.8;
+  }
+
+  /* FIELDS */
+  .field { margin-bottom: 16px; }
+
+  label {
+    display: block;
+    font-family: 'Oswald', Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 7px;
+  }
+
+  input[type=text], input[type=password], textarea, select {
+    width: 100%;
+    padding: 11px 14px;
+    background: var(--bg-input);
+    border: 2px solid var(--border-dim);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: 'Roboto', Arial, sans-serif;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    resize: vertical;
+  }
+  input:focus, textarea:focus, select:focus {
+    border-color: var(--orange);
+    box-shadow: 0 0 0 3px rgba(255,165,0,0.15);
+  }
+  textarea { min-height: 100px; }
+  input::placeholder, textarea::placeholder { color: #555; }
+  select option { background: var(--bg-card); }
+
+  .passphrase-wrap { position: relative; }
+  .passphrase-wrap input { padding-right: 46px; }
+
+  /* Скрываем нативную кнопку показа пароля во всех браузерах */
+  input[type=password]::-ms-reveal,
+  input[type=password]::-ms-clear { display: none !important; }
+
+  .eye-btn {
+    position: absolute;
+    right: 12px; top: 50%;
+    transform: translateY(-50%);
+    background: none; border: none;
+    color: var(--muted); cursor: pointer;
+    font-size: 15px; padding: 4px;
+    transition: color 0.2s;
+  }
+  .eye-btn:hover { color: var(--orange); }
+
+  .strength-bar {
+    height: 3px; background: var(--border-dim);
+    border-radius: 2px; margin-top: 7px; overflow: hidden;
+  }
+  .strength-fill {
+    height: 100%; border-radius: 2px;
+    transition: width 0.3s, background 0.3s; width: 0%;
+  }
+  .strength-text {
+    font-size: 10px; letter-spacing: 1px; color: var(--muted);
+    margin-top: 4px; text-transform: uppercase;
+    font-family: 'Oswald', sans-serif;
+  }
+
+  .kdf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  /* BUTTON */
+  .btn {
+    width: 100%;
+    padding: 14px 25px;
+    border-radius: 50px;
+    border: none; cursor: pointer;
+    font-family: 'Oswald', 'Impact', sans-serif;
+    font-size: 18px; font-weight: 600;
+    letter-spacing: 2px; text-transform: uppercase;
+    color: white;
+    background: linear-gradient(to bottom, #ffa500, #dc6d04);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.35);
+    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+    position: relative; overflow: hidden;
+  }
+  .btn::after {
+    content: '';
+    position: absolute;
+    top: -50%; left: -60%;
+    width: 40%; height: 200%;
+    background: rgba(255,255,255,0.15);
+    transform: skewX(-20deg);
+    transition: left 0.4s;
+  }
+  .btn:hover::after { left: 120%; }
+  .btn:hover { transform: translateY(-3px); box-shadow: 0 7px 22px rgba(0,0,0,0.4), 0 0 22px var(--orange-dim); }
+  .btn:active { transform: translateY(0); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; box-shadow: none; }
+
+  /* STATUS */
+  .status {
+    display: none;
+    padding: 11px 14px; border-radius: 8px;
+    font-size: 13px; margin-top: 14px;
+    line-height: 1.5; font-weight: 500;
+  }
+  .status.show { display: block; }
+  .status.success { background: rgba(125,255,138,0.08); border: 1px solid rgba(125,255,138,0.3); color: var(--success); }
+  .status.error   { background: rgba(255,107,53,0.08);  border: 1px solid rgba(255,107,53,0.3);  color: var(--error); }
+  .status.working { background: var(--orange-faint);    border: 1px solid rgba(255,165,0,0.3);   color: var(--orange); }
+
+  /* PROGRESS */
+  .progress-wrap { display: none; margin-top: 12px; }
+  .progress-wrap.show { display: block; }
+  .progress-bar-bg { height: 4px; background: var(--border-dim); border-radius: 2px; overflow: hidden; margin-top: 6px; }
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(to right, #ffa500, #dc6d04);
+    border-radius: 2px; width: 0%;
+    transition: width 0.1s;
+    box-shadow: 0 0 8px var(--orange-dim);
+  }
+  .progress-label {
+    font-family: 'Oswald', sans-serif;
+    font-size: 10px; color: var(--muted);
+    letter-spacing: 2px; text-transform: uppercase;
+  }
+
+  /* OUTPUT */
+  .output-area { display: none; margin-top: 18px; }
+  .output-area.show { display: block; }
+
+  .output-header {
+    display: flex; align-items: center;
+    justify-content: space-between; margin-bottom: 8px;
+  }
+  .output-label {
+    font-family: 'Oswald', sans-serif;
+    font-size: 10px; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--orange);
+  }
+  .copy-btn {
+    background: none; border: 1px solid var(--border-dim);
+    color: var(--muted);
+    font-family: 'Oswald', Arial, sans-serif;
+    font-size: 10px; padding: 4px 12px; border-radius: 4px;
+    cursor: pointer; letter-spacing: 1px; text-transform: uppercase;
+    transition: all 0.2s;
+  }
+  .copy-btn:hover, .copy-btn.copied { border-color: var(--orange); color: var(--orange); }
+
+  .output-box {
+    background: var(--bg); border: 2px solid var(--border-dim);
+    border-radius: 8px; padding: 14px;
+    font-family: var(--mono); font-size: 12px;
+    word-break: break-all; line-height: 1.6;
+    color: var(--orange); max-height: 150px; overflow-y: auto;
+  }
+
+  .decrypted-msg { display: none; margin-top: 18px; }
+  .decrypted-msg.show { display: block; }
+  .decrypted-content {
+    background: var(--bg); border: 2px solid rgba(255,165,0,0.3);
+    border-radius: 8px; padding: 18px;
+    font-size: 15px; line-height: 1.7; color: var(--text);
+    white-space: pre-wrap; word-break: break-word;
+  }
+
+  .sep {
+    display: flex; align-items: center; gap: 10px;
+    margin: 16px 0; color: var(--muted);
+    font-family: 'Oswald', sans-serif;
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+  }
+  .sep::before, .sep::after { content: ''; flex: 1; height: 1px; background: var(--border-dim); }
+
+  .format-details {
+    background: rgba(0,0,0,0.2); border: 1px solid var(--border-dim);
+    border-radius: 8px; padding: 14px;
+    font-family: var(--mono); font-size: 11px;
+    color: var(--muted); line-height: 2;
+  }
+  .format-details span { color: var(--orange); }
+
+  footer {
+    text-align: center; margin-top: 50px;
+    padding-top: 28px; border-top: 1px solid var(--border-dim);
+    color: #555; font-family: 'Oswald', sans-serif;
+    font-size: 10px; letter-spacing: 2px;
+    text-transform: uppercase; line-height: 2.5;
+  }
+  footer .highlight { color: var(--orange); }
+
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: var(--orange); }
+  ::-webkit-scrollbar-thumb { background: var(--bg); border-radius: 6px; }
+
+  /* IMAGE PANEL */
+  .img-drop-zone {
+    border: 2px dashed var(--border-dim);
+    border-radius: 10px;
+    padding: 36px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+  }
+  .img-drop-zone:hover, .img-drop-zone.drag-over {
+    border-color: var(--orange);
+    background: var(--orange-faint);
+  }
+  .img-drop-zone input[type=file] {
+    position: absolute; inset: 0;
+    opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .drop-icon { font-size: 36px; margin-bottom: 10px; }
+  .drop-text {
+    font-family: 'Oswald', sans-serif;
+    font-size: 13px; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .drop-hint {
+    font-size: 11px; color: #555;
+    margin-top: 6px; letter-spacing: 1px;
+  }
+
+  .img-preview-wrap {
+    display: none; margin-top: 14px;
+    border-radius: 8px; overflow: hidden;
+    border: 2px solid var(--border-dim);
+    background: var(--bg); text-align: center;
+    max-height: 280px;
+  }
+  .img-preview-wrap.show { display: block; }
+  .img-preview-wrap img {
+    max-width: 100%; max-height: 276px;
+    object-fit: contain; display: block; margin: 0 auto;
+  }
+  .img-preview-info {
+    padding: 8px 12px;
+    font-family: var(--mono); font-size: 11px;
+    color: var(--muted); border-top: 1px solid var(--border-dim);
+    text-align: left;
+  }
+
+  .warning-box {
+    background: rgba(255,107,53,0.08);
+    border: 1px solid rgba(255,107,53,0.35);
+    border-radius: 8px; padding: 12px 14px;
+    font-size: 12px; line-height: 1.7;
+    color: #ffaa80; margin-bottom: 16px;
+  }
+  .warning-box strong {
+    color: var(--error);
+    font-family: 'Oswald', sans-serif;
+    letter-spacing: 1px; text-transform: uppercase;
+  }
+
+  .img-result-wrap {
+    display: none; margin-top: 16px;
+  }
+  .img-result-wrap.show { display: block; }
+
+  @media (max-width: 600px) {
+    .logo-title { font-size: 1.6rem; }
+    .kdf-grid { grid-template-columns: 1fr; }
+    .card { padding: 20px 16px; }
+    .wrapper { padding: 28px 16px 60px; }
+    .tab { font-size: 11px; padding: 11px 6px; letter-spacing: 1px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+<div class="bg-glow"></div>
+
+<div class="wrapper">
+  <header>
+    <div class="logo-title">🦊 CipherMsg</div>
+    <div class="logo-sub">Шифрование для мессенджеров</div>
+    <div class="header-divider"></div>
+    <div class="security-badges">
+      <span class="badge hot">AES-256-GCM</span>
+      <span class="badge hot">PBKDF2-SHA-512</span>
+      <span class="badge">No Cookies</span>
+      <span class="badge">No Network</span>
+      <span class="badge">WebCrypto API</span>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('encrypt')">🔒 Зашифровать</div>
+    <div class="tab" onclick="switchTab('decrypt')">🔓 Расшифровать</div>
+    <div class="tab" onclick="switchTab('image')">🖼 Фото</div>
+  </div>
+
+  <!-- ENCRYPT PANEL -->
+  <div class="panel active" id="panel-encrypt">
+    <div class="card">
+      <div class="card-label">// Параметры ключа</div>
+
+      <div class="field">
+        <label>Парольная фраза</label>
+        <div class="passphrase-wrap">
+          <input type="password" id="enc-pass" placeholder="Введите секретную парольную фразу..." oninput="checkStrength(this,'str-fill-e','str-text-e')">
+          <button class="eye-btn" onclick="toggleEye('enc-pass',this)">👁</button>
+        </div>
+        <div class="strength-bar"><div class="strength-fill" id="str-fill-e"></div></div>
+        <div class="strength-text" id="str-text-e">— введите пароль</div>
+      </div>
+
+      <div class="kdf-grid">
+        <div class="field">
+          <label>Алгоритм KDF</label>
+          <select id="enc-kdf">
+            <option value="PBKDF2-SHA512">PBKDF2-SHA-512</option>
+            <option value="PBKDF2-SHA256">PBKDF2-SHA-256</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Итерации KDF</label>
+          <select id="enc-iter">
+            <option value="random">Случайно (1000–10000)</option>
+            <option value="1000">1 000</option>
+            <option value="5000">5 000</option>
+            <option value="10000">10 000</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">// Сообщение</div>
+      <div class="field">
+        <textarea id="enc-msg" placeholder="Введите сообщение для шифрования..." rows="5"></textarea>
+      </div>
+
+      <button class="btn" id="enc-btn" onclick="encryptMessage()">🔒 Зашифровать</button>
+
+      <div class="progress-wrap" id="enc-progress">
+        <div class="progress-label">Вычисление KDF...</div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="enc-pbar"></div></div>
+      </div>
+
+      <div class="status" id="enc-status"></div>
+
+      <div class="output-area" id="enc-output">
+        <div class="output-header">
+          <span class="output-label">Base64 — скопируй и отправь</span>
+          <button class="copy-btn" id="enc-copy" onclick="copyOutput('enc-result','enc-copy')">Копировать</button>
+        </div>
+        <div class="output-box" id="enc-result"></div>
+        <div class="sep">детали пакета</div>
+        <div class="format-details" id="enc-details"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DECRYPT PANEL -->
+  <div class="panel" id="panel-decrypt">
+    <div class="card">
+      <div class="card-label">// Парольная фраза</div>
+      <div class="field">
+        <label>Парольная фраза</label>
+        <div class="passphrase-wrap">
+          <input type="password" id="dec-pass" placeholder="Введите парольную фразу отправителя...">
+          <button class="eye-btn" onclick="toggleEye('dec-pass',this)">👁</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">// Зашифрованное сообщение (Base64)</div>
+      <div class="field">
+        <textarea id="dec-input" placeholder="Вставьте Base64 строку полученную из мессенджера..." rows="5"></textarea>
+      </div>
+
+      <button class="btn" id="dec-btn" onclick="decryptMessage()">🔓 Расшифровать</button>
+
+      <div class="progress-wrap" id="dec-progress">
+        <div class="progress-label">Вычисление KDF...</div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="dec-pbar"></div></div>
+      </div>
+
+      <div class="status" id="dec-status"></div>
+
+      <div class="decrypted-msg" id="dec-output">
+        <div class="output-header">
+          <span class="output-label">Расшифрованное сообщение</span>
+          <button class="copy-btn" id="dec-copy" onclick="copyOutput('dec-result','dec-copy')">Копировать</button>
+        </div>
+        <div class="decrypted-content" id="dec-result"></div>
+        <div class="sep">метаданные пакета</div>
+        <div class="format-details" id="dec-details"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- IMAGE PANEL -->
+  <div class="panel" id="panel-image">
+
+    <div class="warning-box">
+      <strong>⚠ Важно</strong> — отправляй зашифрованный файл только через «<strong>Прикрепить файл</strong>», а не как фотографию.<br>
+      Мессенджеры пережимают изображения и стирают метаданные — это сломает шифротекст и потеряет ключевые параметры KDF.
+    </div>
+
+    <!-- ENCRYPT IMAGE -->
+    <div class="card">
+      <div class="card-label">// Зашифровать изображение</div>
+
+      <div class="field">
+        <label>Парольная фраза</label>
+        <div class="passphrase-wrap">
+          <input type="password" id="img-enc-pass" placeholder="Секретная парольная фраза..." oninput="checkStrength(this,'img-str-fill','img-str-text')">
+          <button class="eye-btn" onclick="toggleEye('img-enc-pass',this)">👁</button>
+        </div>
+        <div class="strength-bar"><div class="strength-fill" id="img-str-fill"></div></div>
+        <div class="strength-text" id="img-str-text">— введите пароль</div>
+      </div>
+
+      <div class="field">
+        <label>Изображение (PNG / JPEG)</label>
+        <div class="img-drop-zone" id="img-enc-drop">
+          <input type="file" id="img-enc-file" accept="image/png,image/jpeg" onchange="onEncImageSelect(this)">
+          <div class="drop-icon">🖼</div>
+          <div class="drop-text">Перетащи или выбери файл</div>
+          <div class="drop-hint">PNG · JPEG — на выходе всегда PNG</div>
+        </div>
+        <div class="img-preview-wrap" id="img-enc-preview">
+          <img id="img-enc-thumb" alt="">
+          <div class="img-preview-info" id="img-enc-info"></div>
+        </div>
+      </div>
+
+      <button class="btn" id="img-enc-btn" onclick="encryptImage()" disabled>🔒 Зашифровать фото</button>
+
+      <div class="progress-wrap" id="img-enc-progress">
+        <div class="progress-label">Шифрование пикселей...</div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="img-enc-pbar"></div></div>
+      </div>
+
+      <div class="status" id="img-enc-status"></div>
+
+      <div class="img-result-wrap" id="img-enc-result">
+        <div class="output-header">
+          <span class="output-label">Зашифрованный PNG</span>
+          <button class="copy-btn" onclick="downloadEncrypted()">⬇ Скачать</button>
+        </div>
+        <div class="img-preview-wrap show">
+          <img id="img-enc-out-thumb" alt="">
+          <div class="img-preview-info" id="img-enc-out-info"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DECRYPT IMAGE -->
+    <div class="card">
+      <div class="card-label">// Расшифровать изображение</div>
+
+      <div class="field">
+        <label>Парольная фраза</label>
+        <div class="passphrase-wrap">
+          <input type="password" id="img-dec-pass" placeholder="Парольная фраза отправителя...">
+          <button class="eye-btn" onclick="toggleEye('img-dec-pass',this)">👁</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Зашифрованный PNG</label>
+        <div class="img-drop-zone" id="img-dec-drop">
+          <input type="file" id="img-dec-file" accept="image/png" onchange="onDecImageSelect(this)">
+          <div class="drop-icon">🔐</div>
+          <div class="drop-text">Выбери зашифрованный PNG</div>
+          <div class="drop-hint">Только PNG с метаданными CipherMsg</div>
+        </div>
+        <div class="img-preview-wrap" id="img-dec-preview">
+          <img id="img-dec-thumb" alt="">
+          <div class="img-preview-info" id="img-dec-info"></div>
+        </div>
+      </div>
+
+      <button class="btn" id="img-dec-btn" onclick="decryptImage()" disabled>🔓 Расшифровать фото</button>
+
+      <div class="progress-wrap" id="img-dec-progress">
+        <div class="progress-label">Расшифровка пикселей...</div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="img-dec-pbar"></div></div>
+      </div>
+
+      <div class="status" id="img-dec-status"></div>
+
+      <div class="img-result-wrap" id="img-dec-result">
+        <div class="output-header">
+          <span class="output-label">Расшифрованное изображение</span>
+          <button class="copy-btn" onclick="downloadDecrypted()">⬇ Скачать</button>
+        </div>
+        <div class="img-preview-wrap show">
+          <img id="img-dec-out-thumb" alt="">
+          <div class="img-preview-info" id="img-dec-out-info"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    <div>Шифрование выполняется <span class="highlight">локально</span> в твоём браузере</div>
+    <div>Никакие данные не покидают устройство · Нет серверов · Нет логов</div>
+    <div>WebCrypto API · AES-256-GCM · PBKDF2</div>
+  </footer>
+</div>
+
+<script>
+// ============================================================
+// BINARY PACKET FORMAT
+// [1]   KDF ID: 0x01=PBKDF2-SHA512, 0x02=PBKDF2-SHA256
+// [32]  Salt
+// [4]   Iterations (uint32 LE, random 1000-10000)
+// [12]  AES-GCM Nonce
+// [N]   AES-256-GCM Ciphertext:
+//         [6]  "SUCC0K" success marker
+//         [4]  Message length (uint32 LE)
+//         [M]  UTF-8 message
+//         [16] GCM auth tag
+// ============================================================
+
+const KDF_IDS   = { 'PBKDF2-SHA512': 0x01, 'PBKDF2-SHA256': 0x02 };
+const KDF_NAMES = { 0x01: 'PBKDF2-SHA-512', 0x02: 'PBKDF2-SHA-256' };
+const SUCCESS_MARKER = new Uint8Array([0x53,0x55,0x43,0x43,0x30,0x4B]);
+
+function switchTab(tab) {
+  const tabs = document.querySelectorAll('.tab');
+  const names = ['encrypt','decrypt','image'];
+  tabs.forEach((t,i) => t.classList.toggle('active', names[i] === tab));
+  names.forEach(n => {
+    document.getElementById('panel-'+n).classList.toggle('active', n === tab);
+  });
+}
+
+function toggleEye(id, btn) {
+  const inp = document.getElementById(id);
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+}
+
+function checkStrength(inp, fillId, textId) {
+  const val = inp.value;
+  const fill = document.getElementById(fillId);
+  const text = document.getElementById(textId);
+  let score = 0;
+  if (val.length >= 8)  score++;
+  if (val.length >= 16) score++;
+  if (/[A-Z]/.test(val)) score++;
+  if (/[0-9]/.test(val)) score++;
+  if (/[^A-Za-z0-9]/.test(val)) score++;
+  const levels = [
+    { w:'0%',   c:'#ff4466', t:'— введите пароль' },
+    { w:'20%',  c:'#ff4466', t:'— слабый' },
+    { w:'40%',  c:'#ff9900', t:'— умеренный' },
+    { w:'65%',  c:'#ffdd00', t:'— хороший' },
+    { w:'85%',  c:'#ffa500', t:'— сильный' },
+    { w:'100%', c:'#7dff8a', t:'— отличный' },
+  ];
+  const lv = val.length === 0 ? 0 : Math.min(score, 5);
+  fill.style.width = levels[lv].w;
+  fill.style.background = levels[lv].c;
+  text.textContent = levels[lv].t;
+}
+
+async function copyOutput(elemId, btnId) {
+  const text = document.getElementById(elemId).textContent;
+  await navigator.clipboard.writeText(text);
+  const el = typeof btnId === 'string' ? document.getElementById(btnId) : btnId;
+  const orig = el.textContent;
+  el.textContent = '✓ Скопировано';
+  el.classList.add('copied');
+  setTimeout(() => { el.textContent = orig; el.classList.remove('copied'); }, 2000);
+}
+
+function bytesToBase64(bytes) {
+  let b = '';
+  for (let i = 0; i < bytes.length; i++) b += String.fromCharCode(bytes[i]);
+  return btoa(b);
+}
+
+function base64ToBytes(b64) {
+  const binary = atob(b64.trim());
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function hexOf(bytes) {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function concatBytes(...arrays) {
+  const total = arrays.reduce((s,a) => s + a.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const arr of arrays) { out.set(arr, offset); offset += arr.length; }
+  return out;
+}
+
+async function deriveKey(passphrase, salt, iterations, kdfAlgo) {
+  const enc = new TextEncoder();
+  const mat = await crypto.subtle.importKey('raw', enc.encode(passphrase), 'PBKDF2', false, ['deriveBits']);
+  const hashAlgo = kdfAlgo === 'PBKDF2-SHA512' ? 'SHA-512' : 'SHA-256';
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations, hash: hashAlgo }, mat, 512
+  );
+  const keyBytes = new Uint8Array(bits);
+  return crypto.subtle.importKey('raw', keyBytes.slice(0,32), { name: 'AES-GCM' }, false, ['encrypt','decrypt']);
+}
+
+function startProgress(barId) {
+  const bar = document.getElementById(barId);
+  bar.style.width = '0%';
+  let w = 0;
+  const iv = setInterval(() => { w = Math.min(w + Math.random()*4, 85); bar.style.width = w+'%'; }, 60);
+  return { stop: () => { clearInterval(iv); bar.style.width = '100%'; } };
+}
+
+async function encryptMessage() {
+  const passphrase = document.getElementById('enc-pass').value;
+  const message    = document.getElementById('enc-msg').value;
+  const kdfAlgo    = document.getElementById('enc-kdf').value;
+  const iterSel    = document.getElementById('enc-iter').value;
+
+  const setStatus = (msg, type) => {
+    const el = document.getElementById('enc-status');
+    el.textContent = msg; el.className = 'status show ' + type;
+  };
+
+  if (!passphrase) { setStatus('⚠ Введите парольную фразу', 'error'); return; }
+  if (!message)    { setStatus('⚠ Введите сообщение', 'error'); return; }
+
+  const iterations = iterSel === 'random' ? (Math.floor(Math.random()*9001)+1000) : parseInt(iterSel);
+  const btn = document.getElementById('enc-btn');
+  btn.disabled = true;
+  document.getElementById('enc-output').classList.remove('show');
+  document.getElementById('enc-status').className = 'status';
+  setStatus('⚙ Вычисление KDF... подождите несколько секунд', 'working');
+  document.getElementById('enc-progress').classList.add('show');
+  const prog = startProgress('enc-pbar');
+
+  try {
+    const salt  = crypto.getRandomValues(new Uint8Array(32));
+    const nonce = crypto.getRandomValues(new Uint8Array(12));
+    const kdfId = KDF_IDS[kdfAlgo];
+    const aesKey = await deriveKey(passphrase, salt, iterations, kdfAlgo);
+    prog.stop();
+
+    const msgBytes = new TextEncoder().encode(message);
+    const msgLen = new Uint8Array(4);
+    new DataView(msgLen.buffer).setUint32(0, msgBytes.length, true);
+    const plaintext = concatBytes(SUCCESS_MARKER, msgLen, msgBytes);
+    const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name:'AES-GCM', iv:nonce }, aesKey, plaintext));
+
+    const kdfIdByte = new Uint8Array([kdfId]);
+    const iterBytes = new Uint8Array(4);
+    new DataView(iterBytes.buffer).setUint32(0, iterations, true);
+
+    const packet = concatBytes(kdfIdByte, salt, iterBytes, nonce, ciphertext);
+    const b64 = bytesToBase64(packet);
+
+    document.getElementById('enc-result').textContent = b64;
+    document.getElementById('enc-details').innerHTML = `
+      <span>KDF:</span> ${kdfAlgo} &nbsp;·&nbsp; <span>Итерации:</span> ${iterations.toLocaleString('ru')}<br>
+      <span>Соль (hex):</span> ${hexOf(salt).substring(0,32)}...<br>
+      <span>Nonce (hex):</span> ${hexOf(nonce)}<br>
+      <span>Размер пакета:</span> ${packet.length} байт → ${b64.length} символов Base64<br>
+      <span>Маркер:</span> SUCC0K (внутри шифротекста)<br>
+      <span>Шифр:</span> AES-256-GCM с аутентификацией
+    `;
+    document.getElementById('enc-output').classList.add('show');
+    setStatus('✓ Готово · ' + b64.length + ' символов Base64 — скопируй и отправь', 'success');
+  } catch(e) {
+    prog.stop();
+    setStatus('✗ Ошибка шифрования: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    document.getElementById('enc-progress').classList.remove('show');
+  }
+}
+
+async function decryptMessage() {
+  const passphrase = document.getElementById('dec-pass').value;
+  const b64input   = document.getElementById('dec-input').value.trim();
+
+  const setStatus = (msg, type) => {
+    const el = document.getElementById('dec-status');
+    el.textContent = msg; el.className = 'status show ' + type;
+  };
+
+  if (!passphrase) { setStatus('⚠ Введите парольную фразу', 'error'); return; }
+  if (!b64input)   { setStatus('⚠ Вставьте Base64 строку', 'error'); return; }
+
+  document.getElementById('dec-output').classList.remove('show');
+  document.getElementById('dec-status').className = 'status';
+  const btn = document.getElementById('dec-btn');
+  btn.disabled = true;
+  setStatus('⚙ Разбор пакета и вычисление KDF...', 'working');
+  document.getElementById('dec-progress').classList.add('show');
+  const prog = startProgress('dec-pbar');
+
+  try {
+    let packet;
+    try { packet = base64ToBytes(b64input); } catch(e) { throw new Error('Невалидный Base64'); }
+    if (packet.length < 71) throw new Error('Пакет слишком короткий — возможно повреждён');
+
+    let offset = 0;
+    const kdfId    = packet[offset++];
+    const salt     = packet.slice(offset, offset += 32);
+    const iterView = new DataView(packet.buffer, packet.byteOffset + offset, 4);
+    const iterations = iterView.getUint32(0, true); offset += 4;
+    const nonce      = packet.slice(offset, offset += 12);
+    const ciphertext = packet.slice(offset);
+
+    if (!KDF_NAMES[kdfId]) throw new Error(`Неизвестный KDF ID: 0x${kdfId.toString(16)}`);
+    const kdfAlgo = kdfId === 0x01 ? 'PBKDF2-SHA512' : 'PBKDF2-SHA256';
+    if (iterations < 100 || iterations > 100000) throw new Error('Подозрительное число итераций');
+
+    const aesKey = await deriveKey(passphrase, salt, iterations, kdfAlgo);
+    prog.stop();
+
+    let plaintext;
+    try {
+      plaintext = new Uint8Array(await crypto.subtle.decrypt({ name:'AES-GCM', iv:nonce }, aesKey, ciphertext));
+    } catch(e) {
+      throw new Error('Неверная парольная фраза или повреждённые данные');
+    }
+
+    if (plaintext.length < 10) throw new Error('Расшифрованные данные слишком короткие');
+    const marker = plaintext.slice(0, 6);
+    if (!marker.every((b,i) => b === SUCCESS_MARKER[i]))
+      throw new Error('Маркер верификации не совпадает — неверная парольная фраза');
+
+    const msgLenView = new DataView(plaintext.buffer, plaintext.byteOffset + 6, 4);
+    const msgLen = msgLenView.getUint32(0, true);
+    const msgBytes = plaintext.slice(10, 10 + msgLen);
+    if (msgBytes.length !== msgLen) throw new Error('Повреждённые данные: размер не совпадает');
+
+    const message = new TextDecoder().decode(msgBytes);
+    document.getElementById('dec-result').textContent = message;
+    document.getElementById('dec-details').innerHTML = `
+      <span>KDF:</span> ${KDF_NAMES[kdfId]} &nbsp;·&nbsp; <span>Итерации:</span> ${iterations.toLocaleString('ru')}<br>
+      <span>Соль (hex):</span> ${hexOf(salt).substring(0,32)}...<br>
+      <span>Nonce (hex):</span> ${hexOf(nonce)}<br>
+      <span>Маркер:</span> SUCC0K ✓ верифицирован<br>
+      <span>Размер сообщения:</span> ${msgLen} байт
+    `;
+    document.getElementById('dec-output').classList.add('show');
+    setStatus('✓ Сообщение успешно расшифровано', 'success');
+  } catch(e) {
+    prog.stop();
+    setStatus('✗ ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    document.getElementById('dec-progress').classList.remove('show');
+  }
+}
+
+
+// ============================================================
+// ChaCha20-Poly1305 — встроенная реализация (RFC 8439, без CDN)
+// ============================================================
+const _CC20 = (() => {
+  function rotl32(v,n){return((v<<n)|(v>>>(32-n)))>>>0;}
+  function quarter(s,a,b,c,d){
+    s[a]=(s[a]+s[b])>>>0;s[d]=rotl32(s[d]^s[a],16);
+    s[c]=(s[c]+s[d])>>>0;s[b]=rotl32(s[b]^s[c],12);
+    s[a]=(s[a]+s[b])>>>0;s[d]=rotl32(s[d]^s[a], 8);
+    s[c]=(s[c]+s[d])>>>0;s[b]=rotl32(s[b]^s[c], 7);
+  }
+  function block(key,counter,nonce){
+    const k=new DataView(key.buffer,key.byteOffset);
+    const n=new DataView(nonce.buffer,nonce.byteOffset);
+    const s=new Uint32Array([
+      0x61707865,0x3320646e,0x79622d32,0x6b206574,
+      k.getUint32(0,true),k.getUint32(4,true),k.getUint32(8,true),k.getUint32(12,true),
+      k.getUint32(16,true),k.getUint32(20,true),k.getUint32(24,true),k.getUint32(28,true),
+      counter>>>0,
+      n.getUint32(0,true),n.getUint32(4,true),n.getUint32(8,true),
+    ]);
+    const w=s.slice();
+    for(let i=0;i<10;i++){
+      quarter(w,0,4,8,12);quarter(w,1,5,9,13);quarter(w,2,6,10,14);quarter(w,3,7,11,15);
+      quarter(w,0,5,10,15);quarter(w,1,6,11,12);quarter(w,2,7,8,13);quarter(w,3,4,9,14);
+    }
+    const out=new Uint8Array(64);
+    const dv=new DataView(out.buffer);
+    for(let i=0;i<16;i++)dv.setUint32(i*4,(w[i]+s[i])>>>0,true);
+    return out;
+  }
+  function stream(key,nonce,data,ctr=1){
+    const out=new Uint8Array(data.length);
+    for(let i=0;i<data.length;i+=64){
+      const b=block(key,ctr+(i/64|0),nonce);
+      for(let j=0;j<64&&i+j<data.length;j++)out[i+j]=data[i+j]^b[j];
+    }
+    return out;
+  }
+  function poly1305mac(key32,msg){
+    const toBI=(b,l)=>{let v=0n;for(let i=0;i<l;i++)v|=BigInt(b[i])<<BigInt(8*i);return v;};
+    const r=new Uint8Array(key32.slice(0,16));
+    // clamp r
+    [3,7,11,15].forEach(i=>r[i]&=15);[4,8,12].forEach(i=>r[i]&=252);
+    const rn=toBI(r,16), sn=toBI(key32.slice(16,32),16);
+    const p=(1n<<130n)-5n;
+    let acc=0n;
+    for(let i=0;i<msg.length;i+=16){
+      const c=msg.slice(i,i+16);
+      const n=new Uint8Array(17);n.set(c);n[c.length]=1;
+      acc=(acc+toBI(n,17))*rn%p;
+    }
+    acc=(acc+sn)&((1n<<128n)-1n);
+    const tag=new Uint8Array(16);
+    for(let i=0;i<16;i++){tag[i]=Number(acc&0xffn);acc>>=8n;}
+    return tag;
+  }
+  function otk(key,nonce){return block(key,0,nonce).slice(0,32);}
+  function pad16(n){return(16-(n%16))%16;}
+  function macInput(cipher){
+    const p=new Uint8Array(pad16(cipher.length));
+    const lc=new Uint8Array(8);
+    new DataView(lc.buffer).setBigUint64(0,BigInt(cipher.length),true);
+    return concatBytes(cipher,p,new Uint8Array(8),lc);
+  }
+  return {
+    encrypt(key,nonce,plain){
+      const cipher=stream(key,nonce,plain);
+      const tag=poly1305mac(otk(key,nonce),macInput(cipher));
+      return concatBytes(cipher,tag);
+    },
+    decrypt(key,nonce,ct){
+      const cipher=ct.slice(0,-16),tag=ct.slice(-16);
+      const exp=poly1305mac(otk(key,nonce),macInput(cipher));
+      let diff=0;for(let i=0;i<16;i++)diff|=tag[i]^exp[i];
+      if(diff!==0)throw new Error('Poly1305 auth failed — неверный пароль или повреждённые данные');
+      return stream(key,nonce,cipher);
+    }
+  };
+})();
+
+// ============================================================
+// IMAGE ENCRYPTION — ChaCha20-Poly1305
+// PNG tEXt "CipherMsg" = "chacha20poly1305|salt_b64|nonce_b64|iter|fmt|tag_b64"
+// ============================================================
+
+let _encImageData=null, _decImageData=null, _encResultBlob=null, _decResultBlob=null;
+
+async function deriveImageKey(passphrase,salt,iterations){
+  const mat=await crypto.subtle.importKey('raw',new TextEncoder().encode(passphrase),'PBKDF2',false,['deriveBits']);
+  return new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',salt,iterations,hash:'SHA-512'},mat,256));
+}
+
+['img-enc-drop','img-dec-drop'].forEach(id=>{
+  const el=document.getElementById(id);
+  el.addEventListener('dragover',e=>{e.preventDefault();el.classList.add('drag-over');});
+  el.addEventListener('dragleave',()=>el.classList.remove('drag-over'));
+  el.addEventListener('drop',e=>{
+    e.preventDefault();el.classList.remove('drag-over');
+    const f=e.dataTransfer.files[0];if(!f)return;
+    if(id==='img-enc-drop')handleEncFile(f);else handleDecFile(f);
+  });
+});
+
+function onEncImageSelect(inp){if(inp.files[0])handleEncFile(inp.files[0]);}
+function onDecImageSelect(inp){if(inp.files[0])handleDecFile(inp.files[0]);}
+
+function handleEncFile(file){
+  if(!file.type.match(/^image\/(png|jpeg)$/)){alert('Поддерживаются только PNG и JPEG');return;}
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const cv=document.createElement('canvas');
+      cv.width=img.width;cv.height=img.height;
+      const ctx=cv.getContext('2d');ctx.drawImage(img,0,0);
+      _encImageData={imageData:ctx.getImageData(0,0,cv.width,cv.height),fileName:file.name,origFmt:file.type};
+      document.getElementById('img-enc-thumb').src=e.target.result;
+      document.getElementById('img-enc-info').textContent=`${img.width}×${img.height}px · ${file.type} · ${(file.size/1024).toFixed(1)} KB`;
+      document.getElementById('img-enc-preview').classList.add('show');
+      document.getElementById('img-enc-btn').disabled=false;
+      document.getElementById('img-enc-result').classList.remove('show');
+      document.getElementById('img-enc-status').className='status';
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleDecFile(file){
+  if(file.type!=='image/png'){alert('Ожидается PNG файл');return;}
+  _decImageData={blob:file,fileName:file.name};
+  const reader=new FileReader();
+  reader.onload=e=>{
+    document.getElementById('img-dec-thumb').src=e.target.result;
+    document.getElementById('img-dec-info').textContent=`${file.name} · ${(file.size/1024).toFixed(1)} KB`;
+    document.getElementById('img-dec-preview').classList.add('show');
+    document.getElementById('img-dec-btn').disabled=false;
+    document.getElementById('img-dec-result').classList.remove('show');
+    document.getElementById('img-dec-status').className='status';
+  };
+  reader.readAsDataURL(file);
+}
+
+function buildPNG(width,height,rgbaData,metaValue){
+  const u32be=n=>{const b=new Uint8Array(4);new DataView(b.buffer).setUint32(0,n,false);return b;};
+  const crc32tbl=new Uint32Array(256);
+  for(let i=0;i<256;i++){let c=i;for(let j=0;j<8;j++)c=c&1?0xEDB88320^(c>>>1):c>>>1;crc32tbl[i]=c;}
+  const crc32=d=>{let c=0xFFFFFFFF;for(let i=0;i<d.length;i++)c=crc32tbl[(c^d[i])&0xFF]^(c>>>8);return(c^0xFFFFFFFF)>>>0;};
+  const chunk=(type,data)=>{
+    const tb=new TextEncoder().encode(type);
+    const cd=concatBytes(tb,data);
+    const cv=new Uint8Array(4);new DataView(cv.buffer).setUint32(0,crc32(cd),false);
+    return concatBytes(u32be(data.length),tb,data,cv);
+  };
+  const ihdr=new Uint8Array(13);
+  const dv=new DataView(ihdr.buffer);
+  dv.setUint32(0,width,false);dv.setUint32(4,height,false);
+  ihdr[8]=8;ihdr[9]=6;
+  const rows=new Uint8Array(height*(1+width*4));
+  for(let y=0;y<height;y++){
+    rows[y*(1+width*4)]=0;
+    rows.set(rgbaData.subarray(y*width*4,(y+1)*width*4),y*(1+width*4)+1);
+  }
+  return new Promise(async resolve=>{
+    const cs=new CompressionStream('deflate');
+    const w=cs.writable.getWriter();w.write(rows);w.close();
+    const ch=[];const r=cs.readable.getReader();
+    while(true){const{done,value}=await r.read();if(done)break;ch.push(value);}
+    const comp=concatBytes(...ch);
+    const textData=concatBytes(
+      new TextEncoder().encode('CipherMsg'),new Uint8Array([0]),new TextEncoder().encode(metaValue)
+    );
+    resolve(concatBytes(
+      new Uint8Array([137,80,78,71,13,10,26,10]),
+      chunk('IHDR',ihdr),chunk('tEXt',textData),chunk('IDAT',comp),chunk('IEND',new Uint8Array(0))
+    ));
+  });
+}
+
+async function readPNGTextChunk(buffer){
+  const view=new DataView(buffer);let offset=8;
+  while(offset<buffer.byteLength-12){
+    const len=view.getUint32(offset,false);offset+=4;
+    const type=String.fromCharCode(...new Uint8Array(buffer,offset,4));offset+=4;
+    const data=new Uint8Array(buffer,offset,len);offset+=len;offset+=4;
+    if(type==='tEXt'){
+      const text=new TextDecoder().decode(data);
+      const ni=text.indexOf('\0');
+      if(ni!==-1&&text.substring(0,ni)==='CipherMsg')return text.substring(ni+1);
+    }
+    if(type==='IEND')break;
+  }
+  return null;
+}
+
+async function encryptImage(){
+  const pass=document.getElementById('img-enc-pass').value;
+  const st=(msg,type)=>{const el=document.getElementById('img-enc-status');el.textContent=msg;el.className='status show '+type;};
+  if(!pass){st('⚠ Введите парольную фразу','error');return;}
+  if(!_encImageData){st('⚠ Выберите изображение','error');return;}
+  const btn=document.getElementById('img-enc-btn');btn.disabled=true;
+  document.getElementById('img-enc-result').classList.remove('show');
+  document.getElementById('img-enc-status').className='status';
+  st('⚙ Вычисление KDF...','working');
+  document.getElementById('img-enc-progress').classList.add('show');
+  const prog=startProgress('img-enc-pbar');
+  try{
+    const iter=Math.floor(Math.random()*9001)+1000;
+    const salt=crypto.getRandomValues(new Uint8Array(32));
+    const nonce=crypto.getRandomValues(new Uint8Array(12));
+    const key=await deriveImageKey(pass,salt,iter);
+    prog.stop();st('⚙ Шифрование пикселей...','working');
+    const {imageData,origFmt}=_encImageData;
+    // Извлекаем только RGB байты (без alpha) — избегаем Canvas premultiplied alpha
+    const rgbOnly=new Uint8Array(imageData.width*imageData.height*3);
+    const srcRgba=imageData.data;
+    for(let i=0,j=0;i<srcRgba.length;i+=4,j+=3){rgbOnly[j]=srcRgba[i];rgbOnly[j+1]=srcRgba[i+1];rgbOnly[j+2]=srcRgba[i+2];}
+    const ct=_CC20.encrypt(key,nonce,rgbOnly);
+    const pixCipher=ct.slice(0,-16),tag=ct.slice(-16);
+    // Восстанавливаем RGBA: RGB из шифротекста, alpha=255 (чтобы Canvas не менял пиксели)
+    const encRgba=new Uint8ClampedArray(imageData.width*imageData.height*4);
+    for(let i=0,j=0;i<pixCipher.length;i+=3,j+=4){encRgba[j]=pixCipher[i];encRgba[j+1]=pixCipher[i+1];encRgba[j+2]=pixCipher[i+2];encRgba[j+3]=255;}
+    const meta=`chacha20poly1305|${bytesToBase64(salt)}|${bytesToBase64(nonce)}|${iter}|${origFmt==='image/jpeg'?'jpeg':'png'}|${bytesToBase64(tag)}`;
+    const png=await buildPNG(imageData.width,imageData.height,encRgba,meta);
+    _encResultBlob=new Blob([png],{type:'image/png'});
+    document.getElementById('img-enc-out-thumb').src=URL.createObjectURL(_encResultBlob);
+    document.getElementById('img-enc-out-info').textContent=
+      `${imageData.width}×${imageData.height}px · PNG зашифровано · ${(png.length/1024).toFixed(1)} KB · KDF: ${iter.toLocaleString('ru')} итераций`;
+    document.getElementById('img-enc-result').classList.add('show');
+    st('✓ Готово — скачай и отправь файлом, не как фото!','success');
+  }catch(e){prog.stop();st('✗ '+e.message,'error');console.error(e);}
+  finally{btn.disabled=false;document.getElementById('img-enc-progress').classList.remove('show');}
+}
+
+async function decryptImage(){
+  const pass=document.getElementById('img-dec-pass').value;
+  const st=(msg,type)=>{const el=document.getElementById('img-dec-status');el.textContent=msg;el.className='status show '+type;};
+  if(!pass){st('⚠ Введите парольную фразу','error');return;}
+  if(!_decImageData){st('⚠ Выберите файл','error');return;}
+  const btn=document.getElementById('img-dec-btn');btn.disabled=true;
+  document.getElementById('img-dec-result').classList.remove('show');
+  document.getElementById('img-dec-status').className='status';
+  st('⚙ Разбор метаданных PNG...','working');
+  document.getElementById('img-dec-progress').classList.add('show');
+  const prog=startProgress('img-dec-pbar');
+  try{
+    const buf=await _decImageData.blob.arrayBuffer();
+    const meta=await readPNGTextChunk(buf);
+    if(!meta)throw new Error('Метаданные CipherMsg не найдены');
+    const [algo,sb,nb,iterS,,tb]=meta.split('|');
+    if(algo!=='chacha20poly1305')throw new Error('Неизвестный алгоритм: '+algo);
+    const salt=base64ToBytes(sb),nonce=base64ToBytes(nb),tag=base64ToBytes(tb);
+    const iter=parseInt(iterS);
+    st('⚙ Вычисление KDF...','working');
+    const key=await deriveImageKey(pass,salt,iter);
+    prog.stop();st('⚙ Расшифровка пикселей...','working');
+    const imgUrl=URL.createObjectURL(new Blob([buf],{type:'image/png'}));
+    const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=imgUrl;});
+    const cv=document.createElement('canvas');cv.width=img.width;cv.height=img.height;
+    const ctx=cv.getContext('2d');ctx.drawImage(img,0,0);
+    URL.revokeObjectURL(imgUrl);
+    const idata=ctx.getImageData(0,0,img.width,img.height);
+    // Читаем только RGB из Canvas (alpha=255 — premultiplication не искажает данные)
+    const cipherRgb=new Uint8Array(img.width*img.height*3);
+    const encPx=idata.data;
+    for(let i=0,j=0;i<encPx.length;i+=4,j+=3){cipherRgb[j]=encPx[i];cipherRgb[j+1]=encPx[i+1];cipherRgb[j+2]=encPx[i+2];}
+    const plain=_CC20.decrypt(key,nonce,concatBytes(cipherRgb,tag));
+    // Восстанавливаем RGBA из расшифрованного RGB
+    const decRgba=new Uint8ClampedArray(img.width*img.height*4);
+    for(let i=0,j=0;i<plain.length;i+=3,j+=4){decRgba[j]=plain[i];decRgba[j+1]=plain[i+1];decRgba[j+2]=plain[i+2];decRgba[j+3]=255;}
+    const png=await buildPNG(img.width,img.height,decRgba,'');
+    _decResultBlob=new Blob([png],{type:'image/png'});
+    document.getElementById('img-dec-out-thumb').src=URL.createObjectURL(_decResultBlob);
+    document.getElementById('img-dec-out-info').textContent=
+      `${img.width}×${img.height}px · PNG расшифровано · ${(png.length/1024).toFixed(1)} KB`;
+    document.getElementById('img-dec-result').classList.add('show');
+    st('✓ Изображение расшифровано','success');
+  }catch(e){prog.stop();st('✗ '+e.message,'error');console.error(e);}
+  finally{btn.disabled=false;document.getElementById('img-dec-progress').classList.remove('show');}
+}
+
+function downloadEncrypted(){
+  if(!_encResultBlob||!_encImageData)return;
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(_encResultBlob);
+  a.download=_encImageData.fileName.replace(/\.[^.]+$/,'')+'_encrypted.png';
+  a.click();
+}
+
+function downloadDecrypted(){
+  if(!_decResultBlob||!_decImageData)return;
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(_decResultBlob);
+  a.download=_decImageData.fileName.replace(/\.[^.]+$/,'').replace('_encrypted','')+'_decrypted.png';
+  a.click();
+}
+
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){
+    const p=document.querySelector('.panel.active').id;
+    if(p==='panel-encrypt')encryptMessage();
+    else if(p==='panel-decrypt')decryptMessage();
+  }
+});
+</script>
+</body>
+</html>

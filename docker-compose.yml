@@ -1,0 +1,9 @@
+services:
+  ciphermsg:
+    build: .
+    container_name: ciphermsg
+    ports:
+      - "1337:80"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
