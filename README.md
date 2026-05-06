@@ -11,6 +11,10 @@ docker compose up -d
 
 По умолчанию поднимается на порту `1337`. Открой: `http://localhost:1337`
 
+или попробуй уже готовый запущенный билд
+
+https://foxhardsoftness.ru/criptofox/
+
 ---
 
 ## Функциональность
